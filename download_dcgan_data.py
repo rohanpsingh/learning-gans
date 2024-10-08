@@ -2,6 +2,7 @@
 import hashlib
 import os
 
+import time
 from typing import Optional
 from urllib.request import urlopen, Request
 from pathlib import Path
@@ -43,13 +44,27 @@ def download_url_to_file(url: str,
     if content_length is not None and len(content_length) > 0:
         file_size = int(content_length[0])
     sha256_sum = hashlib.sha256()
+
+    downloaded_size = 0  # Initialize the downloaded size tracker
+    start_time = time.time()
     with open(dst, "wb") as f:
         while True:
             buffer = u.read(32768)
             if len(buffer) == 0:
                 break
+            downloaded_size += len(buffer)  # Update the downloaded size
             sha256_sum.update(buffer)
             f.write(buffer)
+            # Print the download progress
+            if file_size:
+                progress = (downloaded_size / file_size) * 100
+                elapsed_time = time.time() - start_time
+                speed = downloaded_size / elapsed_time  # bytes per second
+                eta = (file_size - downloaded_size) / speed if speed > 0 else 0  # remaining time in seconds
+                eta_str = time.strftime("%H:%M:%S", time.gmtime(eta))  # format ETA as HH:MM:SS
+                print(f"\rDownloading... {progress:.2f}% completed, ETA: {eta_str}", end="")
+    print()
+
     digest = sha256_sum.hexdigest()
     if sha256 is not None and sha256 != digest:
         Path(dst).unlink()
