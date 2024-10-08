@@ -68,7 +68,7 @@ def download_dcgan_data() -> None:
                              prefix=DATA_DIR,
                              sha256="46fb89443c578308acf364d7d379fe1b9efb793042c0af734b6112e4fd3a8c74",
                              )
-    unzip(z, BEGINNER_DATA_DIR / "celeba")
+    unzip(z, DATA_DIR / "celeba")
 
 
 def main() -> None:
