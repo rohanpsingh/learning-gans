@@ -17,6 +17,7 @@ import torchvision.transforms as transforms
 import torchvision.utils as vutils
 import numpy as np
 import matplotlib.pyplot as plt
+import matplotlib.animation as animation
 
 from net import *
 
@@ -30,8 +31,8 @@ torch.use_deterministic_algorithms(True) # Needed for reproducible results
 
 ## CONFIG
 dataroot = "data/celeba" # Root directory for dataset
-batch_size = 1024 # Batch size during training
-num_epochs = 5 # Number of training epochs
+batch_size = 128 # Batch size during training
+num_epochs = 20 # Number of training epochs
 
 lr = 0.0002 # Learning rate for optimizers
 beta1 = 0.5 # Beta1 hyperparameter for Adam optimizers
@@ -58,6 +59,7 @@ def save(netG, netD):
     MODELS_DIR.mkdir(exist_ok=True)
     torch.save(netD, MODELS_DIR / "model_discriminator.pth")
     torch.save(netG, MODELS_DIR / "model_generator.pth")
+    print(f"Saved models under {MODELS_DIR}/.")
 
 def train(netG, netD, optimizerG, optimizerD, data, criterion):
     ############################
@@ -185,6 +187,7 @@ def main():
                 img_list.append(vutils.make_grid(fake, padding=2, normalize=True))
 
             iters += 1
+    print("Finished Training.")
 
     ######################################################################
     # save trained models
@@ -206,6 +209,7 @@ def main():
     fig = plt.figure(figsize=(8,8))
     plt.axis("off")
     ims = [[plt.imshow(np.transpose(i,(1,2,0)), animated=True)] for i in img_list]
+    ani = animation.ArtistAnimation(fig, ims, interval=1000, repeat_delay=1000, blit=True)
 
     ######################################################################
     # **Real Images vs. Fake Images**
