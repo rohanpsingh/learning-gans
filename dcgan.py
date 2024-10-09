@@ -1,116 +1,8 @@
 # -*- coding: utf-8 -*-
 """
-DCGAN Tutorial
+DCGAN Tutorial (taken from https://pytorch.org/tutorials/beginner/dcgan_faces_tutorial.html)
 ==============
-
-**Author**: `Nathan Inkawhich <https://github.com/inkawhich>`__
-
 """
-
-
-######################################################################
-# Introduction
-# ------------
-# 
-# This tutorial will give an introduction to DCGANs through an example. We
-# will train a generative adversarial network (GAN) to generate new
-# celebrities after showing it pictures of many real celebrities. Most of
-# the code here is from the DCGAN implementation in
-# `pytorch/examples <https://github.com/pytorch/examples>`__, and this
-# document will give a thorough explanation of the implementation and shed
-# light on how and why this model works. But don’t worry, no prior
-# knowledge of GANs is required, but it may require a first-timer to spend
-# some time reasoning about what is actually happening under the hood.
-# Also, for the sake of time it will help to have a GPU, or two. Lets
-# start from the beginning.
-# 
-# Generative Adversarial Networks
-# -------------------------------
-# 
-# What is a GAN?
-# ~~~~~~~~~~~~~~
-# 
-# GANs are a framework for teaching a deep learning model to capture the training
-# data distribution so we can generate new data from that same
-# distribution. GANs were invented by Ian Goodfellow in 2014 and first
-# described in the paper `Generative Adversarial
-# Nets <https://papers.nips.cc/paper/5423-generative-adversarial-nets.pdf>`__.
-# They are made of two distinct models, a *generator* and a
-# *discriminator*. The job of the generator is to spawn ‘fake’ images that
-# look like the training images. The job of the discriminator is to look
-# at an image and output whether or not it is a real training image or a
-# fake image from the generator. During training, the generator is
-# constantly trying to outsmart the discriminator by generating better and
-# better fakes, while the discriminator is working to become a better
-# detective and correctly classify the real and fake images. The
-# equilibrium of this game is when the generator is generating perfect
-# fakes that look as if they came directly from the training data, and the
-# discriminator is left to always guess at 50% confidence that the
-# generator output is real or fake.
-# 
-# Now, lets define some notation to be used throughout tutorial starting
-# with the discriminator. Let :math:`x` be data representing an image.
-# :math:`D(x)` is the discriminator network which outputs the (scalar)
-# probability that :math:`x` came from training data rather than the
-# generator. Here, since we are dealing with images, the input to
-# :math:`D(x)` is an image of CHW size 3x64x64. Intuitively, :math:`D(x)`
-# should be HIGH when :math:`x` comes from training data and LOW when
-# :math:`x` comes from the generator. :math:`D(x)` can also be thought of
-# as a traditional binary classifier.
-# 
-# For the generator’s notation, let :math:`z` be a latent space vector
-# sampled from a standard normal distribution. :math:`G(z)` represents the
-# generator function which maps the latent vector :math:`z` to data-space.
-# The goal of :math:`G` is to estimate the distribution that the training
-# data comes from (:math:`p_{data}`) so it can generate fake samples from
-# that estimated distribution (:math:`p_g`).
-# 
-# So, :math:`D(G(z))` is the probability (scalar) that the output of the
-# generator :math:`G` is a real image. As described in `Goodfellow’s
-# paper <https://papers.nips.cc/paper/5423-generative-adversarial-nets.pdf>`__,
-# :math:`D` and :math:`G` play a minimax game in which :math:`D` tries to
-# maximize the probability it correctly classifies reals and fakes
-# (:math:`logD(x)`), and :math:`G` tries to minimize the probability that
-# :math:`D` will predict its outputs are fake (:math:`log(1-D(G(z)))`).
-# From the paper, the GAN loss function is
-# 
-# .. math:: \underset{G}{\text{min}} \underset{D}{\text{max}}V(D,G) = \mathbb{E}_{x\sim p_{data}(x)}\big[logD(x)\big] + \mathbb{E}_{z\sim p_{z}(z)}\big[log(1-D(G(z)))\big]
-# 
-# In theory, the solution to this minimax game is where
-# :math:`p_g = p_{data}`, and the discriminator guesses randomly if the
-# inputs are real or fake. However, the convergence theory of GANs is
-# still being actively researched and in reality models do not always
-# train to this point.
-# 
-# What is a DCGAN?
-# ~~~~~~~~~~~~~~~~
-# 
-# A DCGAN is a direct extension of the GAN described above, except that it
-# explicitly uses convolutional and convolutional-transpose layers in the
-# discriminator and generator, respectively. It was first described by
-# Radford et. al. in the paper `Unsupervised Representation Learning With
-# Deep Convolutional Generative Adversarial
-# Networks <https://arxiv.org/pdf/1511.06434.pdf>`__. The discriminator
-# is made up of strided
-# `convolution <https://pytorch.org/docs/stable/nn.html#torch.nn.Conv2d>`__
-# layers, `batch
-# norm <https://pytorch.org/docs/stable/nn.html#torch.nn.BatchNorm2d>`__
-# layers, and
-# `LeakyReLU <https://pytorch.org/docs/stable/nn.html#torch.nn.LeakyReLU>`__
-# activations. The input is a 3x64x64 input image and the output is a
-# scalar probability that the input is from the real data distribution.
-# The generator is comprised of
-# `convolutional-transpose <https://pytorch.org/docs/stable/nn.html#torch.nn.ConvTranspose2d>`__
-# layers, batch norm layers, and
-# `ReLU <https://pytorch.org/docs/stable/nn.html#relu>`__ activations. The
-# input is a latent vector, :math:`z`, that is drawn from a standard
-# normal distribution and the output is a 3x64x64 RGB image. The strided
-# conv-transpose layers allow the latent vector to be transformed into a
-# volume with the same shape as an image. In the paper, the authors also
-# give some tips about how to setup the optimizers, how to calculate the
-# loss functions, and how to initialize the model weights, all of which
-# will be explained in the coming sections.
-# 
 
 #%matplotlib inline
 import argparse
@@ -138,110 +30,22 @@ torch.manual_seed(manualSeed)
 torch.use_deterministic_algorithms(True) # Needed for reproducible results
 
 
-######################################################################
-# Inputs
-# ------
-# 
-# Let’s define some inputs for the run:
-# 
-# -  ``dataroot`` - the path to the root of the dataset folder. We will
-#    talk more about the dataset in the next section.
-# -  ``workers`` - the number of worker threads for loading the data with
-#    the ``DataLoader``.
-# -  ``batch_size`` - the batch size used in training. The DCGAN paper
-#    uses a batch size of 128.
-# -  ``image_size`` - the spatial size of the images used for training.
-#    This implementation defaults to 64x64. If another size is desired,
-#    the structures of D and G must be changed. See
-#    `here <https://github.com/pytorch/examples/issues/70>`__ for more
-#    details.
-# -  ``nc`` - number of color channels in the input images. For color
-#    images this is 3.
-# -  ``nz`` - length of latent vector.
-# -  ``ngf`` - relates to the depth of feature maps carried through the
-#    generator.
-# -  ``ndf`` - sets the depth of feature maps propagated through the
-#    discriminator.
-# -  ``num_epochs`` - number of training epochs to run. Training for
-#    longer will probably lead to better results but will also take much
-#    longer.
-# -  ``lr`` - learning rate for training. As described in the DCGAN paper,
-#    this number should be 0.0002.
-# -  ``beta1`` - beta1 hyperparameter for Adam optimizers. As described in
-#    paper, this number should be 0.5.
-# -  ``ngpu`` - number of GPUs available. If this is 0, code will run in
-#    CPU mode. If this number is greater than 0 it will run on that number
-#    of GPUs.
-#
+## Config
+dataroot = "data/celeba" # Root directory for dataset
+batch_size = 1024 # Batch size during training
+num_epochs = 5 # Number of training epochs
 
-# Root directory for dataset
-dataroot = "data/celeba"
+lr = 0.0002 # Learning rate for optimizers
+beta1 = 0.5 # Beta1 hyperparameter for Adam optimizers
 
-# Number of workers for dataloader
-workers = 2
+image_size = 64 # Spatial size of training images. All images will be resized to this size
+nc = 3 # Number of channels in the training images. For color images this is 3
+nz = 100 # Size of z latent vector (i.e. size of generator input)
+ngf = 64 # Size of feature maps in generator
+ndf = 64 # Size of feature maps in discriminator
 
-# Batch size during training
-batch_size = 128
+ngpu = 1 # Number of GPUs available. Use 0 for CPU mode.
 
-# Spatial size of training images. All images will be resized to this
-#   size using a transformer.
-image_size = 64
-
-# Number of channels in the training images. For color images this is 3
-nc = 3
-
-# Size of z latent vector (i.e. size of generator input)
-nz = 100
-
-# Size of feature maps in generator
-ngf = 64
-
-# Size of feature maps in discriminator
-ndf = 64
-
-# Number of training epochs
-num_epochs = 5
-
-# Learning rate for optimizers
-lr = 0.0002
-
-# Beta1 hyperparameter for Adam optimizers
-beta1 = 0.5
-
-# Number of GPUs available. Use 0 for CPU mode.
-ngpu = 1
-
-
-######################################################################
-# Data
-# ----
-# 
-# In this tutorial we will use the `Celeb-A Faces
-# dataset <http://mmlab.ie.cuhk.edu.hk/projects/CelebA.html>`__ which can
-# be downloaded at the linked site, or in `Google
-# Drive <https://drive.google.com/drive/folders/0B7EVK8r0v71pTUZsaXdaSnZBZzg>`__.
-# The dataset will download as a file named ``img_align_celeba.zip``. Once
-# downloaded, create a directory named ``celeba`` and extract the zip file
-# into that directory. Then, set the ``dataroot`` input for this notebook to
-# the ``celeba`` directory you just created. The resulting directory
-# structure should be:
-# 
-# .. code-block:: sh
-# 
-#    /path/to/celeba
-#        -> img_align_celeba  
-#            -> 188242.jpg
-#            -> 173822.jpg
-#            -> 284702.jpg
-#            -> 537394.jpg
-#               ...
-# 
-# This is an important step because we will be using the ``ImageFolder``
-# dataset class, which requires there to be subdirectories in the
-# dataset root folder. Now, we can create the dataset, create the
-# dataloader, set the device to run on, and finally visualize some of the
-# training data.
-# 
 
 # We can use an image folder dataset the way we have it setup.
 # Create the dataset
@@ -253,6 +57,7 @@ dataset = dset.ImageFolder(root=dataroot,
                                transforms.Normalize((0.5, 0.5, 0.5), (0.5, 0.5, 0.5)),
                            ]))
 # Create the dataloader
+workers = os.cpu_count() # Number of workers for dataloader
 dataloader = torch.utils.data.DataLoader(dataset, batch_size=batch_size,
                                          shuffle=True, num_workers=workers)
 
@@ -267,27 +72,6 @@ plt.title("Training Images")
 plt.imshow(np.transpose(vutils.make_grid(real_batch[0].to(device)[:64], padding=2, normalize=True).cpu(),(1,2,0)))
 plt.show()
 
-
-######################################################################
-# Implementation
-# --------------
-# 
-# With our input parameters set and the dataset prepared, we can now get
-# into the implementation. We will start with the weight initialization
-# strategy, then talk about the generator, discriminator, loss functions,
-# and training loop in detail.
-# 
-# Weight Initialization
-# ~~~~~~~~~~~~~~~~~~~~~
-# 
-# From the DCGAN paper, the authors specify that all model weights shall
-# be randomly initialized from a Normal distribution with ``mean=0``,
-# ``stdev=0.02``. The ``weights_init`` function takes an initialized model as
-# input and reinitializes all convolutional, convolutional-transpose, and
-# batch normalization layers to meet this criteria. This function is
-# applied to the models immediately after initialization.
-# 
-
 # custom weights initialization called on ``netG`` and ``netD``
 def weights_init(m):
     classname = m.__class__.__name__
@@ -297,37 +81,7 @@ def weights_init(m):
         nn.init.normal_(m.weight.data, 1.0, 0.02)
         nn.init.constant_(m.bias.data, 0)
 
-
-######################################################################
-# Generator
-# ~~~~~~~~~
-# 
-# The generator, :math:`G`, is designed to map the latent space vector
-# (:math:`z`) to data-space. Since our data are images, converting
-# :math:`z` to data-space means ultimately creating a RGB image with the
-# same size as the training images (i.e. 3x64x64). In practice, this is
-# accomplished through a series of strided two dimensional convolutional
-# transpose layers, each paired with a 2d batch norm layer and a relu
-# activation. The output of the generator is fed through a tanh function
-# to return it to the input data range of :math:`[-1,1]`. It is worth
-# noting the existence of the batch norm functions after the
-# conv-transpose layers, as this is a critical contribution of the DCGAN
-# paper. These layers help with the flow of gradients during training. An
-# image of the generator from the DCGAN paper is shown below.
-#
-# .. figure:: /_static/img/dcgan_generator.png
-#    :alt: dcgan_generator
-#
-# Notice, how the inputs we set in the input section (``nz``, ``ngf``, and
-# ``nc``) influence the generator architecture in code. ``nz`` is the length
-# of the z input vector, ``ngf`` relates to the size of the feature maps
-# that are propagated through the generator, and ``nc`` is the number of
-# channels in the output image (set to 3 for RGB images). Below is the
-# code for the generator.
-# 
-
 # Generator Code
-
 class Generator(nn.Module):
     def __init__(self, ngpu):
         super(Generator, self).__init__()
@@ -358,13 +112,6 @@ class Generator(nn.Module):
     def forward(self, input):
         return self.main(input)
 
-
-######################################################################
-# Now, we can instantiate the generator and apply the ``weights_init``
-# function. Check out the printed model to see how the generator object is
-# structured.
-# 
-
 # Create the generator
 netG = Generator(ngpu).to(device)
 
@@ -380,28 +127,8 @@ netG.apply(weights_init)
 print(netG)
 
 
-######################################################################
-# Discriminator
-# ~~~~~~~~~~~~~
-# 
-# As mentioned, the discriminator, :math:`D`, is a binary classification
-# network that takes an image as input and outputs a scalar probability
-# that the input image is real (as opposed to fake). Here, :math:`D` takes
-# a 3x64x64 input image, processes it through a series of Conv2d,
-# BatchNorm2d, and LeakyReLU layers, and outputs the final probability
-# through a Sigmoid activation function. This architecture can be extended
-# with more layers if necessary for the problem, but there is significance
-# to the use of the strided convolution, BatchNorm, and LeakyReLUs. The
-# DCGAN paper mentions it is a good practice to use strided convolution
-# rather than pooling to downsample because it lets the network learn its
-# own pooling function. Also batch norm and leaky relu functions promote
-# healthy gradient flow which is critical for the learning process of both
-# :math:`G` and :math:`D`.
-# 
-
 #########################################################################
 # Discriminator Code
-
 class Discriminator(nn.Module):
     def __init__(self, ngpu):
         super(Discriminator, self).__init__()
