@@ -28,8 +28,7 @@ random.seed(manualSeed)
 torch.manual_seed(manualSeed)
 torch.use_deterministic_algorithms(True) # Needed for reproducible results
 
-
-## Config
+## CONFIG
 dataroot = "data/celeba" # Root directory for dataset
 batch_size = 1024 # Batch size during training
 num_epochs = 5 # Number of training epochs
@@ -130,34 +129,21 @@ def main():
     dataloader = torch.utils.data.DataLoader(dataset, batch_size=batch_size,
                                              shuffle=True, num_workers=workers)
 
-    # Plot some training images
-    real_batch = next(iter(dataloader))
-    plt.figure(figsize=(8,8))
-    plt.axis("off")
-    plt.title("Training Images")
-    plt.imshow(np.transpose(vutils.make_grid(real_batch[0].to(device)[:64], padding=2, normalize=True).cpu(),(1,2,0)))
-    plt.show()
-
-    # Create the generator
+    # Create the Generator and Discriminator network
     netG = Generator(nz, nc, ngf, ngpu).to(device)
     if (device.type == 'cuda') and (ngpu > 1):
         netG = nn.DataParallel(netG, list(range(ngpu)))
-
     netG.apply(weights_init)
     print(netG)
 
-    # Create the Discriminator
     netD = Discriminator(nc, ndf, ngpu).to(device)
     if (device.type == 'cuda') and (ngpu > 1):
         netD = nn.DataParallel(netD, list(range(ngpu)))
-
     netD.apply(weights_init)
     print(netD)
 
-    # Initialize the ``BCELoss`` function
+    # Initialize the ``BCELoss`` function, and Setup Adam optimizers for both G and D
     criterion = nn.BCELoss()
-
-    # Setup Adam optimizers for both G and D
     optimizerD = optim.Adam(netD.parameters(), lr=lr, betas=(beta1, 0.999))
     optimizerG = optim.Adam(netG.parameters(), lr=lr, betas=(beta1, 0.999))
 
