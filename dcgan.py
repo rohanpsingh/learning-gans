@@ -379,6 +379,14 @@ for epoch in range(num_epochs):
             
         iters += 1
 
+# save the model
+from pathlib import Path
+REPO_BASE_DIR = Path(__file__).absolute().parent
+MODELS_DIR = REPO_BASE_DIR / "models"
+MODELS_DIR.mkdir(exist_ok=True)
+torch.save(netD, MODELS_DIR / "model_discriminator.pth")
+torch.save(netG, MODELS_DIR / "model_generator.pth")
+
 
 ######################################################################
 # Results
