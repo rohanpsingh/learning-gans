@@ -1,4 +1,6 @@
+import argparse
 import os
+from pathlib import Path
 import torch
 import torch.nn as nn
 import torchvision.datasets as dset
@@ -10,16 +12,22 @@ import matplotlib.pyplot as plt
 from net import *
 
 
-def load():
-    from pathlib import Path
-    REPO_BASE_DIR = Path(__file__).absolute().parent
-    MODELS_DIR = REPO_BASE_DIR / "models"
-    MODELS_DIR.mkdir(exist_ok=True)
-    netD = torch.load(MODELS_DIR / "model_discriminator.pth", weights_only=False)
-    netG = torch.load(MODELS_DIR / "model_generator.pth", weights_only=False)
+def load(models_dir):
+    netD = torch.load(models_dir / "model_discriminator.pth", weights_only=False)
+    netG = torch.load(models_dir / "model_generator.pth", weights_only=False)
+    print(f"Loaded models from {models_dir}/.")
     return netG, netD
 
 def main():
+
+    # get command line arguments
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--models",
+                        required=True,
+                        type=Path,
+                        help="path to trained model dir",
+    )
+    args = parser.parse_args()
 
     dataroot = "data/celeba" # Root directory for dataset
     image_size = 64
@@ -41,7 +49,7 @@ def main():
                                              shuffle=True, num_workers=workers)
 
     # Load the models
-    netG, netD = load()
+    netG, netD = load(args.models)
     netG.eval()
     netD.eval()
 
