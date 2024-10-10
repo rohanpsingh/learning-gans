@@ -156,6 +156,9 @@ def main():
     optimizerD = optim.Adam(netD.parameters(), lr=lr, betas=(beta1, 0.999))
     optimizerG = optim.Adam(netG.parameters(), lr=lr, betas=(beta1, 0.999))
 
+    lr_schedulerD = optim.lr_scheduler.ExponentialLR(optimizerD, gamma=0.99)
+    lr_schedulerG = optim.lr_scheduler.ExponentialLR(optimizerG, gamma=0.99)
+
     # Create batch of latent vectors that we will use to visualize
     #  the progression of the generator
     fixed_noise = torch.randn(64, nz, 1, 1, device=device)
@@ -179,9 +182,9 @@ def main():
 
             # Output training stats
             if i % 50 == 0:
-                print('[%d/%d][%d/%d]\tLoss_D: %.4f\tLoss_G: %.4f\tD(x): %.4f\tD(G(z)): %.4f / %.4f'
+                print('[%d/%d][%d/%d]\tLoss_D: %.4f\tLoss_G: %.4f\tD(x): %.4f\tD(G(z)): %.4f / %.4f\tLR:( %f %f)'
                       % (epoch, num_epochs, i, len(dataloader),
-                         errD, errG, D_x, D_G_z1, D_G_z2))
+                         errD, errG, D_x, D_G_z1, D_G_z2, optimizerG.param_groups[0]['lr'], optimizerD.param_groups[0]['lr']))
 
             # Save Losses for plotting later
             G_losses.append(errG)
@@ -196,6 +199,12 @@ def main():
                 img_list.append(img)
 
             iters += 1
+
+        # LR step
+        if epoch % 2 == 0:
+            lr_schedulerD.step()
+            lr_schedulerG.step()
+
     print("Finished Training.")
 
     ######################################################################
