@@ -6,6 +6,8 @@ DCGAN Tutorial (taken from https://pytorch.org/tutorials/beginner/dcgan_faces_tu
 
 import argparse
 import os
+from pathlib import Path
+from datetime import datetime
 import random
 import torch
 import torch.nn as nn
@@ -52,14 +54,10 @@ fake_label = 0.
 # Decide which device we want to run on
 device = torch.device("cuda:0" if (torch.cuda.is_available() and ngpu > 0) else "cpu")
 
-def save(netG, netD):
-    from pathlib import Path
-    REPO_BASE_DIR = Path(__file__).absolute().parent
-    MODELS_DIR = REPO_BASE_DIR / "models"
-    MODELS_DIR.mkdir(exist_ok=True)
-    torch.save(netD, MODELS_DIR / "model_discriminator.pth")
-    torch.save(netG, MODELS_DIR / "model_generator.pth")
-    print(f"Saved models under {MODELS_DIR}/.")
+def save(netG, netD, outdir):
+    torch.save(netD, outdir / "model_discriminator.pth")
+    torch.save(netG, outdir / "model_generator.pth")
+    print(f"Saved models under {outdir}/.")
 
 def train(netG, netD, optimizerG, optimizerD, data, criterion):
     ############################
@@ -117,6 +115,15 @@ def train(netG, netD, optimizerG, optimizerD, data, criterion):
     return errD.item(), errG.item(), D_x, D_G_z1, D_G_z2
 
 def main():
+
+    # Create experiment dir
+    REPO_BASE_DIR = Path(__file__).absolute().parent
+    EXP_DIR = Path("exps/exp_" + datetime.now().strftime('%Y-%m-%d-%H-%M-%S'))
+    MODELS_DIR = REPO_BASE_DIR / EXP_DIR / "models"
+    MODELS_DIR.mkdir(exist_ok=True, parents=True)
+    print(f"Experiment directory created at {EXP_DIR}")
+
+
     # We can use an image folder dataset the way we have it setup.
     # Create the dataset
     dataset = dset.ImageFolder(root=dataroot,
@@ -184,14 +191,16 @@ def main():
             if (iters % 500 == 0) or ((epoch == num_epochs-1) and (i == len(dataloader)-1)):
                 with torch.no_grad():
                     fake = netG(fixed_noise).detach().cpu()
-                img_list.append(vutils.make_grid(fake, padding=2, normalize=True))
+                img = vutils.make_grid(fake, padding=2, normalize=True)
+                vutils.save_image(img, EXP_DIR / "netG_out_at_{}.png".format(iters))
+                img_list.append(img)
 
             iters += 1
     print("Finished Training.")
 
     ######################################################################
     # save trained models
-    save(netG, netD)
+    save(netG, netD, MODELS_DIR)
 
     ######################################################################
     # **Loss versus training iteration**
@@ -202,6 +211,9 @@ def main():
     plt.xlabel("iterations")
     plt.ylabel("Loss")
     plt.legend()
+    now = datetime.now()
+    fn = "plot_" + now.strftime("%Y-%m-%d-%H-%M-%S") + ".png"
+    plt.savefig(EXP_DIR / fn, bbox_inches='tight')
     plt.show()
 
     ######################################################################
