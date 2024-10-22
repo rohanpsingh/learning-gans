@@ -13,7 +13,6 @@ from torchvision.datasets import MNIST
 from torch.utils.data import DataLoader
 import torchvision.transforms as transforms
 from mpl_toolkits.axes_grid1 import ImageGrid
-from torchvision.utils import save_image, make_grid
 
 from net import *
 
@@ -27,8 +26,8 @@ torch.use_deterministic_algorithms(True) # Needed for reproducible results
 
 ## CONFIG
 dataroot = "data/" # Root directory for dataset
-batch_size = 128 # Batch size during training
-num_epochs = 20 # Number of training epochs
+batch_size = 1024 # Batch size during training
+num_epochs = 50 # Number of training epochs
 
 lr = 0.001 # Learning rate for optimizers
 
@@ -40,18 +39,6 @@ ngpu = 1 # Number of GPUs available. Use 0 for CPU mode.
 
 # Decide which device we want to run on
 device = torch.device("cuda:0" if (torch.cuda.is_available() and ngpu > 0) else "cpu")
-
-def save(net, outdir):
-    torch.save(net.state_dict(), outdir / "model.pth")
-    logging.info(f"Saved model under {outdir}/.")
-
-def generate_digit(net, mean, var):
-    z_sample = torch.tensor([[mean, var]], dtype=torch.float).to(device)
-    x_decoded = net.decode(z_sample)
-    digit = x_decoded.detach().cpu().reshape(28, 28) # reshape vector to 2d array
-    plt.imshow(digit, cmap='gray')
-    plt.axis('off')
-    plt.show()
 
 def train(net, train_data, criterion, optimizer):
     net.train()
@@ -107,8 +94,8 @@ def main():
     MNIST.mirrors = ['https://ossci-datasets.s3.amazonaws.com/mnist/']
 
     # download the MNIST datasets
-    train_dataset = MNIST(dataroot, transform = transforms.Compose([transforms.ToTensor()]), download = True)
-    valid_dataset  = MNIST(dataroot, transform = transforms.Compose([transforms.ToTensor()]), download = True)
+    train_dataset = MNIST(dataroot, transform = transforms.Compose([transforms.ToTensor()]), train=True, download = True)
+    valid_dataset = MNIST(dataroot, transform = transforms.Compose([transforms.ToTensor()]), train=False, download = True)
 
     # create train and valid dataloaders
     train_data = DataLoader(dataset=train_dataset, batch_size=batch_size, shuffle=True, drop_last=True)
@@ -154,11 +141,8 @@ def main():
     logging.info("Finished Training.")
 
     # save trained models
-    save(net, MODELS_DIR)
-
-    # generate new digit
-    generate_digit(net, 0.0, 1.0)
-    generate_digit(net, 1.0, 0.0)
+    torch.save(net.state_dict(), MODELS_DIR / "model.pth")
+    logging.info(f"Saved model under {MODELS_DIR}/.")
 
 if __name__=="__main__":
     main()
