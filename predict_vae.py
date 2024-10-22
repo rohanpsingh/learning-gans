@@ -42,8 +42,9 @@ def plot_latent_space(net, device, scale=1.0, n=25, digit_size=28, figsize=15):
     plt.show()
 
 def generate_digit(net, mean, var, device):
-    z_sample = torch.tensor([[mean, var]], dtype=torch.float).to(device)
-    x_decoded = net.decode(z_sample)
+    with torch.no_grad():
+        z_sample = torch.tensor([[mean, var]], dtype=torch.float).to(device)
+        x_decoded = net.decode(z_sample)
     digit = x_decoded.detach().cpu().reshape(28, 28) # reshape vector to 2d array
     plt.imshow(digit, cmap='gray')
     plt.title("[{:.3f}, {:.3f}]".format(mean, var), fontsize=28)

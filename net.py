@@ -70,10 +70,10 @@ class Discriminator(nn.Module):
     def forward(self, input):
         return self.main(input)
 
-"""
-A simple implementation of a VAE with Gaussian MLP Encoder and Decoder
-"""
 class VAE(nn.Module):
+    """
+    A simple implementation of a VAE with Gaussian MLP Encoder and Decoder
+    """
     def __init__(self, input_dim=784, hidden_dim=400, latent_dim=200):
         super(VAE, self).__init__()
 
