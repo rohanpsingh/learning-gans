@@ -118,7 +118,7 @@ def main():
     ################################################################
 
     # Set network model, loss criterion and optimizer
-    net = VAE().to(device)
+    net = VAE(x_dim, hidden_dim, latent_dim).to(device)
     optimizer = optim.Adam(net.parameters(), lr=lr)
     logging.info(repr(optimizer))
 

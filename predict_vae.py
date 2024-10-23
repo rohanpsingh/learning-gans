@@ -1,17 +1,14 @@
 import argparse
-import os
 from pathlib import Path
 import torch
 import torch.nn as nn
-import torchvision.datasets as dset
-import torchvision.transforms as transforms
-import torchvision.utils as vutils
 import numpy as np
 import random
 import matplotlib.pyplot as plt
 
 from net import *
 
+# this only works when latent space is 2D
 def plot_latent_space(net, device, scale=1.0, n=25, digit_size=28, figsize=15):
     # display a n*n 2D manifold of digits
     figure = np.zeros((digit_size * n, digit_size * n))
@@ -40,16 +37,31 @@ def plot_latent_space(net, device, scale=1.0, n=25, digit_size=28, figsize=15):
     plt.ylabel("var, z [1]", fontsize=28)
     plt.imshow(figure, cmap="Greys_r")
     plt.show()
+    return
 
+@torch.no_grad()
+def compute_elbo(net, x, device):
+    x = x.to(device)
+    x_hat, mean, log_var = net(x)
+
+    # likelihood term
+    log_likelihood = nn.functional.binary_cross_entropy(x_hat, x, reduction='sum')
+    # KL divergence term
+    KLD = - 0.5 * torch.sum(1+ log_var - mean.pow(2) - log_var.exp())
+    # ELBO
+    elbo = log_likelihood + KLD
+    return elbo.item()
+
+@torch.no_grad()
 def generate_digit(net, mean, var, device):
-    with torch.no_grad():
-        z_sample = torch.tensor([[mean, var]], dtype=torch.float).to(device)
-        x_decoded = net.decode(z_sample)
+    z_sample = torch.tensor([[mean, var]], dtype=torch.float).to(device)
+    x_decoded = net.decode(z_sample)
     digit = x_decoded.detach().cpu().reshape(28, 28) # reshape vector to 2d array
     plt.imshow(digit, cmap='gray')
     plt.title("[{:.3f}, {:.3f}]".format(mean, var), fontsize=28)
     plt.axis('off')
     plt.show()
+    return x_decoded
 
 def initialize_net(trained_weights):
     net = VAE()
@@ -83,8 +95,10 @@ def main():
 
     # generate new images
     for _ in range(5):
-        z = np.random.uniform(-2, 2, 2)
-        generate_digit(net, *z, device)
+        z = np.random.uniform(-1, 1, 2)
+        x_hat = generate_digit(net, *z, device)
+        elbo = compute_elbo(net, x_hat, device)
+        print(elbo)
 
     # plot the latent space
     plot_latent_space(net, device)
