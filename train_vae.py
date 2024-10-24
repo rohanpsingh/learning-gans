@@ -27,7 +27,6 @@ torch.use_deterministic_algorithms(True) # Needed for reproducible results
 
 ## CONFIG
 dataroot = "data/" # Root directory for dataset
-batch_size = 1024 # Batch size during training
 
 hidden_dim = 400
 latent_dim = 200
@@ -51,7 +50,7 @@ def train(net, train_data, criterion, optimizer):
         optimizer.zero_grad()
         loss.backward()
         optimizer.step()
-    return sum(losses)/(len(losses) * batch_size)
+    return sum(losses)/len(losses)
 
 @torch.no_grad()
 def valid(net, valid_data, criterion):
@@ -64,7 +63,7 @@ def valid(net, valid_data, criterion):
             x_hat, mean, log_var = net(x)
             loss = criterion(x, x_hat, mean, log_var)
             error.append(loss.data)
-    return sum(error)/(len(error) * batch_size)
+    return sum(error)/len(error)
 
 def main():
 
@@ -72,6 +71,7 @@ def main():
     ap.add_argument("-e", "--epochs", required=False, default=100, type=int)
     ap.add_argument("-d", "--dataset", required=False, default="mnist")
     ap.add_argument("--lr", required=False, default=1e-3, type=float)
+    ap.add_argument("--batch_size", required=False, default=128, type=int)
     args = ap.parse_args()
 
     # Create experiment dir
@@ -104,14 +104,14 @@ def main():
         from dataloader import RobotStateDataset
         train_dataset = RobotStateDataset(Path(args.dataset), train=True)
         valid_dataset = RobotStateDataset(Path(args.dataset), train=False)
-        x = 108
+        x_dim = 108
 
     # create train and valid dataloaders
-    train_data = DataLoader(dataset=train_dataset, batch_size=batch_size, shuffle=True, drop_last=True)
-    logging.info("train data: %d batches of batch size %d", len(train_data), batch_size)
+    train_data = DataLoader(dataset=train_dataset, batch_size=args.batch_size, shuffle=True, drop_last=True)
+    logging.info("train data: %d batches of batch size %d", len(train_data), args.batch_size)
 
-    valid_data = DataLoader(dataset=valid_dataset, batch_size=batch_size, shuffle=True, drop_last=True)
-    logging.info("valid data: %d batches of batch size %d", len(valid_data), batch_size)
+    valid_data = DataLoader(dataset=valid_dataset, batch_size=args.batch_size, shuffle=True, drop_last=True)
+    logging.info("valid data: %d batches of batch size %d", len(valid_data), args.batch_size)
 
     ################################################################
     # # Get 25 sample training images for visualization (optional) #
@@ -144,8 +144,8 @@ def main():
         valid_loss = valid(net, valid_data, criterion)
         logging.info("iters: %d train_loss: %f valid_loss: %f lr: %f",
                      epoch,
-                     train_loss.item(),
-                     valid_loss.item(),
+                     train_loss.item()/args.batch_size,
+                     valid_loss.item()/args.batch_size,
                      optimizer.param_groups[0]['lr'])
     logging.info("Finished Training.")
 
