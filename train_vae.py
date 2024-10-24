@@ -100,11 +100,14 @@ def main():
         train_dataset = MNIST(dataroot, transform = transform, train=True, download = True)
         valid_dataset = MNIST(dataroot, transform = transform, train=False, download = True)
         x_dim = 784
+        loss_fn = nn.functional.binary_cross_entropy
+
     else:
         from dataloader import RobotStateDataset
         train_dataset = RobotStateDataset(Path(args.dataset), train=True)
         valid_dataset = RobotStateDataset(Path(args.dataset), train=False)
         x_dim = 108
+        loss_fn = nn.functional.mse_loss
 
     # create train and valid dataloaders
     train_data = DataLoader(dataset=train_dataset, batch_size=args.batch_size, shuffle=True, drop_last=True)
@@ -132,7 +135,7 @@ def main():
     logging.info(repr(optimizer))
 
     def loss_function(x, x_hat, mean, log_var):
-        reproduction_loss = nn.functional.binary_cross_entropy(x_hat, x, reduction='sum')
+        reproduction_loss = loss_fn(x_hat, x, reduction='sum')
         KLD = - 0.5 * torch.sum(1+ log_var - mean.pow(2) - log_var.exp())
         return reproduction_loss + KLD
 
