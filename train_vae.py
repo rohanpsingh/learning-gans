@@ -28,9 +28,6 @@ torch.use_deterministic_algorithms(True) # Needed for reproducible results
 ## CONFIG
 dataroot = "data/" # Root directory for dataset
 
-hidden_dim = 400
-latent_dim = 200
-
 ngpu = 1 # Number of GPUs available. Use 0 for CPU mode.
 
 # Decide which device we want to run on
@@ -100,13 +97,17 @@ def main():
         train_dataset = MNIST(dataroot, transform = transform, train=True, download = True)
         valid_dataset = MNIST(dataroot, transform = transform, train=False, download = True)
         x_dim = 784
+        hidden_dim = 400
+        latent_dim = 200
         loss_fn = nn.functional.binary_cross_entropy
 
     else:
         from dataloader import RobotStateDataset
         train_dataset = RobotStateDataset(Path(args.dataset), train=True)
         valid_dataset = RobotStateDataset(Path(args.dataset), train=False)
-        x_dim = 108
+        x_dim = 54*5
+        hidden_dim = 200
+        latent_dim = 20
         loss_fn = nn.functional.mse_loss
 
     # create train and valid dataloaders
@@ -140,6 +141,7 @@ def main():
         return reproduction_loss + KLD
 
     criterion = loss_function
+    lr_scheduler = torch.optim.lr_scheduler.ExponentialLR(optimizer, gamma=0.99)
 
     # train/test the network
     for epoch in range(args.epochs):
@@ -150,10 +152,15 @@ def main():
                      train_loss.item()/args.batch_size,
                      valid_loss.item()/args.batch_size,
                      optimizer.param_groups[0]['lr'])
+
+        if epoch%10==0:
+            lr_scheduler.step()
+
     logging.info("Finished Training.")
 
     # save trained models
-    torch.save(net.state_dict(), MODELS_DIR / "model.pth")
+    torch.save(net.state_dict(), MODELS_DIR / "model_state_dict.pth")
+    torch.save(net, MODELS_DIR / "model.pt")
     logging.info(f"Saved model under {MODELS_DIR}/.")
 
 if __name__=="__main__":
