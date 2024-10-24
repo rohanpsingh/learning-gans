@@ -1,3 +1,4 @@
+import argparse
 import os
 from pathlib import Path
 from datetime import datetime
@@ -27,11 +28,7 @@ torch.use_deterministic_algorithms(True) # Needed for reproducible results
 ## CONFIG
 dataroot = "data/" # Root directory for dataset
 batch_size = 1024 # Batch size during training
-num_epochs = 50 # Number of training epochs
 
-lr = 0.001 # Learning rate for optimizers
-
-x_dim  = 784
 hidden_dim = 400
 latent_dim = 200
 
@@ -45,7 +42,7 @@ def train(net, train_data, criterion, optimizer):
     losses = []
 
     for batch_idx, (x, _) in enumerate(train_data):
-        x = x.view(batch_size, x_dim).to(device)
+        x = x.to(device)
 
         x_hat, mean, log_var = net(x)
         loss = criterion(x, x_hat, mean, log_var)
@@ -62,7 +59,7 @@ def valid(net, valid_data, criterion):
     error = []
     with torch.no_grad():
         for batch_idx, (x, _) in enumerate(valid_data):
-            x = x.view(batch_size, x_dim).to(device)
+            x = x.to(device)
 
             x_hat, mean, log_var = net(x)
             loss = criterion(x, x_hat, mean, log_var)
@@ -70,6 +67,12 @@ def valid(net, valid_data, criterion):
     return sum(error)/(len(error) * batch_size)
 
 def main():
+
+    ap = argparse.ArgumentParser()
+    ap.add_argument("-e", "--epochs", required=False, default=100, type=int)
+    ap.add_argument("-d", "--dataset", required=False, default="mnist")
+    ap.add_argument("--lr", required=False, default=1e-3, type=float)
+    args = ap.parse_args()
 
     # Create experiment dir
     REPO_BASE_DIR = Path(__file__).absolute().parent
@@ -90,12 +93,18 @@ def main():
     console.setFormatter(logging.Formatter('%(message)s'))
     logging.getLogger('').addHandler(console)
 
-    # select mirror
-    MNIST.mirrors = ['https://ossci-datasets.s3.amazonaws.com/mnist/']
-
     # download the MNIST datasets
-    train_dataset = MNIST(dataroot, transform = transforms.Compose([transforms.ToTensor()]), train=True, download = True)
-    valid_dataset = MNIST(dataroot, transform = transforms.Compose([transforms.ToTensor()]), train=False, download = True)
+    if args.dataset=="mnist":
+        MNIST.mirrors = ['https://ossci-datasets.s3.amazonaws.com/mnist/']
+        transform = transforms.Compose([transforms.ToTensor(), transforms.Lambda(lambda x: torch.flatten(x))])
+        train_dataset = MNIST(dataroot, transform = transform, train=True, download = True)
+        valid_dataset = MNIST(dataroot, transform = transform, train=False, download = True)
+        x_dim = 784
+    else:
+        from dataloader import RobotStateDataset
+        train_dataset = RobotStateDataset(Path(args.dataset), train=True)
+        valid_dataset = RobotStateDataset(Path(args.dataset), train=False)
+        x = 108
 
     # create train and valid dataloaders
     train_data = DataLoader(dataset=train_dataset, batch_size=batch_size, shuffle=True, drop_last=True)
@@ -119,7 +128,7 @@ def main():
 
     # Set network model, loss criterion and optimizer
     net = VAE(x_dim, hidden_dim, latent_dim).to(device)
-    optimizer = optim.Adam(net.parameters(), lr=lr)
+    optimizer = optim.Adam(net.parameters(), lr=args.lr)
     logging.info(repr(optimizer))
 
     def loss_function(x, x_hat, mean, log_var):
@@ -130,7 +139,7 @@ def main():
     criterion = loss_function
 
     # train/test the network
-    for epoch in range(num_epochs):
+    for epoch in range(args.epochs):
         train_loss = train(net, train_data, criterion, optimizer)
         valid_loss = valid(net, valid_data, criterion)
         logging.info("iters: %d train_loss: %f valid_loss: %f lr: %f",
