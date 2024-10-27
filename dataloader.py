@@ -1,3 +1,4 @@
+from scipy.spatial.transform import Rotation as R
 from pathlib import Path
 import pickle
 import numpy as np
@@ -10,9 +11,8 @@ LEG_JOINTS = ['RCY', 'RCR', 'RCP', 'RKP', 'RAP', 'RAR',
 WAIST_JOINTS = ['WP','WR','WY']
 
 class RobotStateDataset(torch.utils.data.Dataset):
-    def __init__(self, path_to_pkl, train = True):
+    def __init__(self, path_to_pkl, meanstd = {}, train = True):
         self.train = train
-        meanstd = {}
 
         self.joint_names = ARM_JOINTS + LEG_JOINTS + WAIST_JOINTS
 
@@ -61,9 +61,12 @@ class RobotStateDataset(torch.utils.data.Dataset):
         for idx in range(1, len(pkl_data["root_pose"])):
             x = []
             for j in range(2):
+                root_pose = pkl_data["root_pose"][idx-j]
+                r = R.from_quat(root_pose[3:])
+                euler = r.as_euler('zyx', degrees=False)
                 s = np.concatenate((
+                    [root_pose[2], euler[1], euler[2]],
                     [pkl_data["joint_position"][k][idx-j] for k in self.joint_names],
-                    [pkl_data["joint_velocity"][k][idx-j] for k in self.joint_names],
                 ))
                 x.append(s)
             dataset.append(np.array(x).flatten())
