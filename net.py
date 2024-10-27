@@ -81,22 +81,22 @@ class VAE(nn.Module):
         self.encoder = nn.Sequential(
             nn.Linear(input_dim, hidden_dim),
             nn.LeakyReLU(0.2),
-            nn.Linear(hidden_dim, latent_dim),
+            nn.Linear(hidden_dim, hidden_dim),
             nn.LeakyReLU(0.2)
             )
 
         # latent mean and variance
-        self.mean_layer = nn.Linear(latent_dim, 2)
-        self.logvar_layer = nn.Linear(latent_dim, 2)
+        self.mean_layer = nn.Linear(hidden_dim, latent_dim)
+        self.logvar_layer = nn.Linear(hidden_dim, latent_dim)
 
         # decoder
         self.decoder = nn.Sequential(
-            nn.Linear(2, latent_dim),
-            nn.LeakyReLU(0.2),
             nn.Linear(latent_dim, hidden_dim),
             nn.LeakyReLU(0.2),
+            nn.Linear(hidden_dim, hidden_dim),
+            nn.LeakyReLU(0.2),
             nn.Linear(hidden_dim, input_dim),
-            nn.Sigmoid()
+            #nn.Sigmoid()
             )
 
     def encode(self, x):
