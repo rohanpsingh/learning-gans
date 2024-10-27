@@ -103,11 +103,13 @@ def main():
 
     else:
         from dataloader import RobotStateDataset
-        train_dataset = RobotStateDataset(Path(args.dataset), train=True)
-        valid_dataset = RobotStateDataset(Path(args.dataset), train=False)
-        x_dim = 54*5
+        dataset = RobotStateDataset(Path(args.dataset), train=True)
+        train_len = int(0.8 * len(dataset))
+        valid_len = len(dataset) - train_len
+        train_dataset, valid_dataset = torch.utils.data.random_split(dataset, [train_len, valid_len])
+        x_dim = len(train_dataset[0][0])
         hidden_dim = 200
-        latent_dim = 20
+        latent_dim = 5
         loss_fn = nn.functional.mse_loss
 
     # create train and valid dataloaders
