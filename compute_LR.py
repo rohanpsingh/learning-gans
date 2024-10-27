@@ -28,15 +28,16 @@ def KL_div(mu,logvar,reduction = 'none'):
 def store_NLL(x, recon, mu, logvar, z):
     sigma = torch.exp(0.5*logvar)
     b = x.size(0)
-    target = Variable(x.data.view(-1) * 255).long()
     recon = recon.contiguous()
-    recon = recon.view(-1,256)
-    cross_entropy = F.cross_entropy(recon, target, reduction='none')
-    log_p_x_z = -torch.sum(cross_entropy.view(b ,-1), 1)
+    #cross_entropy = torch.nn.functional.cross_entropy(recon, target, reduction='none')
+    mse_loss = nn.functional.mse_loss(x, recon, reduction='none')#.sum(axis=1)
+
+    log_p_x_z = -torch.sum(mse_loss.view(b ,-1), 1)
     log_p_z = -torch.sum(z**2/2+np.log(2*np.pi)/2,1)
     z_eps = (z - mu)/sigma
-    z_eps = z_eps.view(opt.repeat,-1)
+    z_eps = z_eps.view(b, -1)
     log_q_z_x = -torch.sum(z_eps**2/2 + np.log(2*np.pi)/2 + logvar/2, 1)
+
     weights = log_p_x_z+log_p_z-log_q_z_x
     return weights
 
@@ -45,14 +46,38 @@ def compute_NLL(weights):
     NLL_loss = -(torch.log(torch.mean(torch.exp(weights - weights.max())))+weights.max())
     return NLL_loss
 
+@torch.no_grad()
+def likelihood(net, data):
+    error = []
+    for batch_idx, (x, _) in enumerate(data):
+        x = x.expand(200, -1).contiguous()
+        x = x.to(device)
+        b = x.size(0)
+        weights_agg  = []
+
+        for batch_number in range(5):
+
+            mu, logvar = net.encode(x)
+            z = net.reparameterization(mu, torch.exp(0.5*logvar))
+            recon = net.decode(z)
+
+            weights = store_NLL(x, recon, mu, logvar, z)
+
+        weights_agg.append(weights)
+        weights_agg = torch.stack(weights_agg).view(-1)
+
+        nll_loss = compute_NLL(weights_agg)
+        error.append(nll_loss.item())
+    return error
+
+@torch.no_grad()
 def reconstruction_loss(net, data):
     error = []
-    with torch.no_grad():
-        for batch_idx, (x, _) in enumerate(data):
-            x = x.to(device)
-            x_hat, mean, log_var = net(x)
-            loss = nn.functional.mse_loss(x, x_hat, reduction='sum')
-            error.append(loss.item())
+    for batch_idx, (x, _) in enumerate(data):
+        x = x.to(device)
+        x_hat, mean, log_var = net(x)
+        loss = nn.functional.mse_loss(x, x_hat, reduction='sum')
+        error.append(loss.item())
     return error
 
 def main():
@@ -87,26 +112,38 @@ def main():
     torch.use_deterministic_algorithms(True) # Needed for reproducible results
     print("====Loaded weights====")
 
+    meanstd = torch.load('data/mean.pth.tar', weights_only=False)
+
     # load data (OOD)
-    dataset = RobotStateDataset(Path(args.test_data), train=True)
+    dataset = RobotStateDataset(Path(args.test_data), meanstd=meanstd, train=False)
     data = DataLoader(dataset=dataset, batch_size=1, shuffle=False, drop_last=True)
     print("test data: {} batches of batch size {}".format(len(data), 1))
 
     error_ood = reconstruction_loss(net, data)
+    likelihood_ood = likelihood(net, data)
 
     # load data (ID)
-    dataset = RobotStateDataset(args.id_data, train=True)
+    dataset = RobotStateDataset(args.id_data, meanstd=meanstd, train=False)
     data = DataLoader(dataset=dataset, batch_size=1, shuffle=False, drop_last=True)
     print("test data: {} batches of batch size {}".format(len(data), 1))
 
     error_id = reconstruction_loss(net, data)
+    likelihood_id = likelihood(net, data)
 
     print("Mean OOD error = {:.3f}. Mean ID error = {:.3f}".format(
         np.mean(error_ood), np.mean(error_id))
     )
-    plt.plot(error_ood, label='ood')
-    plt.plot(error_id, label='id')
-    plt.legend()
+    print("Mean OOD likelihood = {:.3f}. Mean ID likelihood = {:.3f}".format(
+        np.mean(likelihood_ood), np.mean(likelihood_id))
+    )
+
+    fig, axs = plt.subplots(2, 1)
+    axs[0].plot(error_ood, label='ood')
+    axs[0].plot(error_id, label='id')
+    axs[0].legend()
+    axs[1].plot(likelihood_ood, label='ood')
+    axs[1].plot(likelihood_id, label='id')
+    axs[1].legend()
     plt.show()
 
 if __name__=="__main__":
