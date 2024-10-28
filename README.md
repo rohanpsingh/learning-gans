@@ -1,8 +1,24 @@
-## VAE  
+## GAN
 
 Command line examples
 
-### Train VAE  
+### Train GAN
+
+```
+$ python dcgan.py
+```
+
+### GAN inference
+
+```
+$ python inference.py --models exps/exp_2024-10-10-13-45-10/models/
+```
+
+## VAE
+
+Command line examples
+
+### Train VAE
 
 ```
 $ CUBLAS_WORKSPACE_CONFIG=:4096:8 python train_vae.py --epochs 400 --batch_size 2048 --dataset data/mocap/
