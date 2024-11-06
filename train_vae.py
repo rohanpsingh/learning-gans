@@ -137,6 +137,9 @@ def main():
     optimizer = optim.Adam(net.parameters(), lr=args.lr)
     logging.info(repr(optimizer))
 
+    net.mean_inp = torch.from_numpy(dataset.mean).to(device).float()
+    net.std_inp = torch.from_numpy(dataset.std).to(device).float()
+
     def loss_function(x, x_hat, mean, log_var):
         reproduction_loss = loss_fn(x_hat, x, reduction='sum')
         KLD = - 0.5 * torch.sum(1+ log_var - mean.pow(2) - log_var.exp())
@@ -163,6 +166,14 @@ def main():
     # save trained models
     torch.save(net.state_dict(), MODELS_DIR / "model_state_dict.pth")
     torch.save(net, MODELS_DIR / "model.pt")
+    # save torch script model (cpu)
+    net.eval()
+    net = net.to('cpu')
+    net.mean_inp = net.mean_inp.to('cpu')
+    net.std_inp = net.std_inp.to('cpu')
+    example = torch.rand(x_dim, device='cpu')
+    traced_script_net = torch.jit.trace(net, example)
+    torch.jit.save(traced_script_net, MODELS_DIR / "jit_model.pt")
     logging.info(f"Saved model under {MODELS_DIR}/.")
 
 if __name__=="__main__":

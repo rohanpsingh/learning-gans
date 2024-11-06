@@ -9,8 +9,6 @@ import matplotlib.pyplot as plt
 from torch.utils.data import DataLoader
 from dataloader import RobotStateDataset
 
-from net import *
-
 # Use CUDA if possible
 device = torch.device("cuda:0" if torch.cuda.is_available() else "cpu")
 
@@ -112,10 +110,8 @@ def main():
     torch.use_deterministic_algorithms(True) # Needed for reproducible results
     print("====Loaded weights====")
 
-    meanstd = torch.load('data/mean.pth.tar', weights_only=False)
-
     # load data (OOD)
-    dataset = RobotStateDataset(Path(args.test_data), meanstd=meanstd, train=False)
+    dataset = RobotStateDataset(Path(args.test_data), train=False)
     data = DataLoader(dataset=dataset, batch_size=1, shuffle=False, drop_last=True)
     print("test data: {} batches of batch size {}".format(len(data), 1))
 
@@ -123,7 +119,7 @@ def main():
     likelihood_ood = likelihood(net, data)
 
     # load data (ID)
-    dataset = RobotStateDataset(args.id_data, meanstd=meanstd, train=False)
+    dataset = RobotStateDataset(args.id_data, train=False)
     data = DataLoader(dataset=dataset, batch_size=1, shuffle=False, drop_last=True)
     print("test data: {} batches of batch size {}".format(len(data), 1))
 

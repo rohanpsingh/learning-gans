@@ -77,6 +77,10 @@ class VAE(nn.Module):
     def __init__(self, input_dim=784, hidden_dim=400, latent_dim=200):
         super(VAE, self).__init__()
 
+        # input normalization parameters
+        self.mean_inp = torch.zeros(input_dim)
+        self.std_inp = torch.ones(input_dim)
+
         # encoder
         self.encoder = nn.Sequential(
             nn.Linear(input_dim, hidden_dim),
@@ -113,6 +117,7 @@ class VAE(nn.Module):
         return self.decoder(x)
 
     def forward(self, x):
+        x = (x - self.mean_inp.to(x.device)) / self.std_inp.to(x.device)
         mean, logvar = self.encode(x)
         z = self.reparameterization(mean, torch.exp(0.5*logvar))
         x_hat = self.decode(z)
