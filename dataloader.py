@@ -10,9 +10,21 @@ LEG_JOINTS = ['RCY', 'RCR', 'RCP', 'RKP', 'RAP', 'RAR',
               'LCY', 'LCR', 'LCP', 'LKP', 'LAP', 'LAR']
 WAIST_JOINTS = ['WP','WR','WY']
 
+class AddGaussianNoise(object):
+    def __init__(self, mean=0., std=1.):
+        self.std = std
+        self.mean = mean
+
+    def __call__(self, tensor):
+        return tensor + torch.randn(tensor.size()).float() * self.std + self.mean
+
+    def __repr__(self):
+        return self.__class__.__name__ + '(mean={0}, std={1})'.format(self.mean, self.std)
+
 class RobotStateDataset(torch.utils.data.Dataset):
-    def __init__(self, path_to_pkl, meanstd = {}, train = True):
+    def __init__(self, path_to_pkl, meanstd = {}, transform = None, train = True):
         self.train = train
+        self.transform = transform
 
         self.joint_names = ARM_JOINTS + LEG_JOINTS + WAIST_JOINTS
 
@@ -58,9 +70,10 @@ class RobotStateDataset(torch.utils.data.Dataset):
 
         # create dataset
         dataset = []
-        for idx in range(1, len(pkl_data["root_pose"])):
+        l = 2
+        for idx in range(l, len(pkl_data["root_pose"])):
             x = []
-            for j in range(2):
+            for j in range(l+1):
                 root_pose = pkl_data["root_pose"][idx-j]
                 r = R.from_quat(root_pose[3:])
                 euler = r.as_euler('zyx', degrees=False)
@@ -78,4 +91,6 @@ class RobotStateDataset(torch.utils.data.Dataset):
     def __getitem__(self, idx):
         x = (self.dataset[idx] - self.mean) / self.std
         x = torch.from_numpy(x).float()
+        if self.transform:
+            x = self.transform(x)
         return x, x

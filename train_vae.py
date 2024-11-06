@@ -102,8 +102,9 @@ def main():
         loss_fn = nn.functional.binary_cross_entropy
 
     else:
-        from dataloader import RobotStateDataset
-        dataset = RobotStateDataset(Path(args.dataset), train=True)
+        from dataloader import RobotStateDataset, AddGaussianNoise
+        transform = transforms.Compose([AddGaussianNoise(0, 0.01)])
+        dataset = RobotStateDataset(Path(args.dataset), transform = transform, train = True)
         train_len = int(0.8 * len(dataset))
         valid_len = len(dataset) - train_len
         train_dataset, valid_dataset = torch.utils.data.random_split(dataset, [train_len, valid_len])
